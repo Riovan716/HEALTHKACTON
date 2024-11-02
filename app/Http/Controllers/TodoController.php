@@ -20,7 +20,8 @@ class TodoController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'activity' => 'required|string|max:255',
-            'target' => 'nullable|integer|min:1' // Tambahkan validasi untuk target
+            'target' => 'nullable|integer|min:1', // Validasi untuk target
+            'frequency' => 'required|in:daily,weekly' // Validasi untuk frekuensi (daily atau weekly)
         ]);
 
         if ($validator->fails()) {
@@ -34,11 +35,13 @@ class TodoController extends Controller
         Todo::create([
             "user_id" => $auth->id,
             "activity" => $request->activity,
-            "target" => $request->target ?? 1 // Default target = 1 jika tidak diisi
+            "target" => $request->target ?? 1, // Default target = 1 jika tidak diisi
+            "frequency" => $request->frequency // Simpan frekuensi yang dipilih oleh pengguna
         ]);
 
-        return redirect()->route("home");
+        return redirect()->route("home")->with('success', 'Todo berhasil ditambahkan!');
     }
+
 
     public function postEdit(Request $request)
     {
@@ -47,24 +50,36 @@ class TodoController extends Controller
             'activity' => 'required|string|max:255',
             'status' => 'required|boolean',
         ]);
+
         if ($validator->fails()) {
             return redirect()
                 ->route('home')
                 ->withErrors($validator)
                 ->withInput();
         }
-        $auth = Auth::user();
-        $todo = Todo::where("id", $request->id)->where(
-            "user_id",
-            $auth->id
-        )->first();
-        if ($todo) {
-            $todo->activity = $request->activity;
-            $todo->status = $request->status;
-            $todo->save();
+
+        $todo = Todo::findOrFail($request->id);
+
+        // Tambah koin jika task selesai
+        if (!$todo->status && $request->status == 1) {
+            $todo->coins += 10; // Tambahkan 10 koin ke task
+            $todo->save(); // Simpan perubahan koin di todo
+
+            // Tambahkan koin ke pengguna
+            $user = Auth::user();
+            $user->coins += 10; // Menambahkan 10 koin ke pengguna
+            $user->save(); // Simpan perubahan koin di pengguna
         }
-        return redirect()->route("home");
+
+        $todo->activity = $request->activity;
+        $todo->status = $request->status;
+        $todo->save();
+
+        return redirect()->route("home")->with('success', 'Todo berhasil diubah! Koin Anda telah bertambah.');
     }
+
+
+
     public function postDelete(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -87,17 +102,28 @@ class TodoController extends Controller
         return redirect()->route("home");
     }
 
-    public function incrementProgress(Request $request, $id)
+    public function incrementProgress($id)
     {
         $todo = Todo::findOrFail($id);
+        $user = Auth::user(); // Ambil pengguna yang sedang login
 
-        // Hanya menambah progres jika belum mencapai target
+        // Tambahkan progres jika belum mencapai target
         if ($todo->progress < $todo->target) {
-            $todo->progress += 1;
-            $todo->save();
+            $todo->progress++;
+
+            // Jika progres telah mencapai target, set status menjadi selesai
+            if ($todo->progress >= $todo->target) {
+                $todo->status = true; // Atur status menjadi selesai
+                $todo->coins += 10; // Tambahkan koin ke tugas
+                $user->coins += 10; // Tambahkan koin ke pengguna
+            }
+
+            $todo->save(); // Simpan perubahan pada todo
+            $user->save(); // Simpan perubahan pada pengguna
         }
 
-        return redirect()->back()->with('success', 'Progres bertambah!');
+        return redirect()->route('home')->with('success', 'Progres berhasil ditambahkan!');
     }
+
 
 }

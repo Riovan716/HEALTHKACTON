@@ -17,6 +17,8 @@ return new class extends Migration {
             $table->boolean('status')->default(false);
             $table->integer('progress')->default(0);
             $table->integer('target')->default(0);
+            $table->enum('frequency', ['daily', 'weekly'])->default('daily'); // Kolom frekuensi
+            $table->integer('coins')->default(0); // Tambahkan kolom coins dengan default 0
             $table->timestamps();
         });
     }
@@ -31,6 +33,8 @@ return new class extends Migration {
         Schema::table('todos', function (Blueprint $table) {
             $table->dropColumn('progress');
             $table->dropColumn('target');
+            $table->dropColumn('frequency');
+            Schema::dropIfExists('todos'); // Hapus tabel todos jika rollback
         });
     }
 };

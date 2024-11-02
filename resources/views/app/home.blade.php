@@ -8,10 +8,10 @@
       <div class="card-body">
         <div class="d-flex justify-content-between">
           <div>
-            <h3>Hay, <span class="text-primary">{{
-  $auth->name }}</span></h3>
+            <h3>Hay, <span class="text-primary">{{ $auth->name }}</span></h3>
           </div>
           <div>
+            <span class="badge bg-warning text-dark">Koin: <span id="totalCoins">{{ Auth::user()->coins }}</span></span>
             <a href="{{ route('logout') }}" class="btn btn-danger">Logout</a>
           </div>
         </div>
@@ -24,6 +24,7 @@
       </div>
       <div class="text-end">
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTodo">Tambah Data</button>
+        <a href="{{ route('shop.index') }}" class="btn btn-success">Shop</a>
       </div>
     </div>
     <hr />
@@ -34,6 +35,8 @@
           <th scope="col">Aktivitas</th>
           <th scope="col">Progres</th>
           <th scope="col">Status</th>
+          <th scope="col">Frekuensi</th>
+          <th scope="col">Koin</th>
           <th scope="col">Tanggal Dibuat</th>
           <th scope="col">Tindakan</th>
         </tr>
@@ -42,11 +45,13 @@
         @if (isset($todos) && sizeof($todos) > 0)
           @php
       $counter = 1;
-      @endphp
+    @endphp
           @foreach ($todos as $todo)
         <tr>
         <td>{{ $counter++ }}</td>
-        <td>{{ $todo->activity }}</td>
+        <td>
+        <a href="{{ route('todo.show', $todo->id) }}">{{ $todo->activity }}</a> <!-- Link to detail -->
+        </td>
         <td>{{ $todo->progress }}/{{ $todo->target }}</td>
         <td>
         @if ($todo->status)
@@ -55,34 +60,32 @@
     <span class="badge bg-danger">Belum Selesai</span>
   @endif
         </td>
+        <td>{{ ucfirst($todo->frequency) }}</td>
+        <td>{{ $todo->coins }}</td>
+        <td>{{ date('d F Y - H:i', strtotime($todo->created_at)) }}</td>
         <td>
-        {{ date('d F Y - H:i', strtotime($todo->created_at)) }}
-        </td>
-        <td>
-        <form action="{{ route('todo.increment-progress', $todo->id) }}" method="POST">
+        <form action="{{ route('todo.increment-progress', $todo->id) }}" method="POST" style="display:inline;">
           @csrf
           <button type="submit" class="btn btn-sm btn-info">Tambah Progres</button>
         </form>
-        <button class="btn btn-sm btn-warning"
-          onclick="showModalEditTodo('{{ $todo->id }}', '{{ $todo->activity }}', '{{ $todo->status }}')">
-          Ubah
-        </button>
-        <button class="btn btn-sm btn-danger"
-          onclick="showModalDeleteTodo('{{ $todo->id }}', '{{ $todo->activity }}')">Hapus</button>
+        <form action="{{ route('post.todo.delete') }}" method="POST" style="display:inline;">
+          @csrf
+          <input type="hidden" name="id" value="{{ $todo->id }}">
+          <button type="submit" class="btn btn-sm btn-danger">Hapus</button>
+        </form>
         </td>
         </tr>
       @endforeach
     @else
     <tr>
-      <td colspan="5" class="text-center text-muted">Belum ada data tersedia!</td>
+      <td colspan="8" class="text-center text-muted">Belum ada data tersedia!</td>
     </tr>
   @endif
-
       </tbody>
     </table>
+
   </div>
 </div>
-
 
 <!-- MODAL ADD TODO -->
 <div class="modal fade" id="addTodo" tabindex="-1" aria-labelledby="addTodoLabel" aria-hidden="true">
@@ -99,9 +102,18 @@
             <label for="inputActivity" class="form-label">Aktivitas</label>
             <input type="text" name="activity" class="form-control" id="inputActivity"
               placeholder="Contoh: Belajar membuat aplikasi website sederhana">
+          </div>
+          <div class="mb-3">
             <label for="inputTarget" class="form-label">Target Progres</label>
             <input type="number" name="target" class="form-control" id="inputTarget"
               placeholder="Masukkan target progres, misal 8">
+          </div>
+          <div class="mb-3">
+            <label for="inputFrequency" class="form-label">Frekuensi</label>
+            <select name="frequency" class="form-select" id="inputFrequency">
+              <option value="daily">Per Hari</option>
+              <option value="weekly">Per Minggu</option>
+            </select>
           </div>
         </div>
         <div class="modal-footer">
@@ -112,6 +124,7 @@
     </div>
   </div>
 </div>
+
 
 <!-- MODAL EDIT TODO -->
 <div class="modal fade" id="editTodo" tabindex="-1" aria-labelledby="editTodoLabel" aria-hidden="true">
@@ -168,11 +181,9 @@
         <form action="{{ route('post.todo.delete') }}" method="POST">
           @csrf
           <input name="id" type="hidden" id="inputDeleteTodoId">
-
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
           <button type="submit" class="btn btn-danger">Ya, Tetap Hapus</button>
         </form>
-
       </div>
     </div>
   </div>
@@ -182,14 +193,10 @@
 @section('other-js') 
 <script>
   function showModalEditTodo(todoId, activity, status) {
-    const modalEditTodo =
-      document.getElementById("editTodo");
-    const inputId =
-      document.getElementById("inputEditTodoId");
-    const inputActivity =
-      document.getElementById("inputEditActivity");
-    const selectStatus =
-      document.getElementById("selectEditStatus");
+    const modalEditTodo = document.getElementById("editTodo");
+    const inputId = document.getElementById("inputEditTodoId");
+    const inputActivity = document.getElementById("inputEditActivity");
+    const selectStatus = document.getElementById("selectEditStatus");
 
     inputId.value = todoId;
     inputActivity.value = activity;
@@ -200,12 +207,9 @@
   }
 
   function showModalDeleteTodo(todoId, activity) {
-    const modalDeleteTodo =
-      document.getElementById("deleteTodo");
-    const elemntActivity =
-      document.getElementById("deleteTodoActivity");
-    const inputId =
-      document.getElementById("inputDeleteTodoId");
+    const modalDeleteTodo = document.getElementById("deleteTodo");
+    const elemntActivity = document.getElementById("deleteTodoActivity");
+    const inputId = document.getElementById("inputDeleteTodoId");
 
     inputId.value = todoId;
     elemntActivity.innerText = activity;
